@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script
+      src="https://unpkg.com/html5-qrcode"
+      type="text/javascript"
+    ></script>
+    <link rel="stylesheet" href="DashCss.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <title>PayApp</title>
+    <!-- <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      header {
+        background: #333;
+        color: #fff;
+        padding: 10px;
+        text-align: center;
+      }
+      .menu {
+        display: flex;
+        justify-content: center;
+        background: #f4f4f4;
+        padding: 10px;
+      }
+      .menu a {
+        margin: 0 15px;
+        text-decoration: none;
+        color: #333;
+      }
+      .menu a.active {
+        font-weight: bold;
+        color: #007bff;
+      }
+      .content {
+        text-align: center;
+        margin-top: 20px;
+      }
+      .hidden {
+        display: none;
+      }
+      #qr-scanner {
+        margin-top: 20px;
+      }
+      #qr-reader {
+        width: 100%;
+        max-width: 300px;
+        height: 300px;
+        margin: 0 auto;
+      }
+      .product-table {
+        margin-top: 20px;
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .product-table th,
+      .product-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      .product-table th {
+        background-color: #f4f4f4;
+      }
+      .button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 10px 2px;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      .button:hover {
+        background-color: #0056b3;
+      }
+      #balance {
+        float: right;
+        margin: 10px;
+        font-size: 16px;
+      }
+    </style> -->
+  </head>
+  <body>
+    <header>
+      <div class="container">
+          <h1>PayApp</h1>
+          <div id="balance"><i class="fas fa-wallet"></i>₹ 0.00</div>
+      </div>
+  </header>
+  <div class="menu">
+      <a href="#" id="home-link" class="active"><i class="fas fa-home"></i> Home</a>
+      <a href="#" id="purchases-link">Purchases</a>
+      <a href="#" id="load-balance-link">Load Balance</a>
+  </div>
+  <div class="container content">
+      <div id="home" class="content-page">
+          <button id="scan-btn" class="button">Scan QR</button>
+          <div id="qr-scanner" class="hidden">
+              <div id="qr-reader"></div>
+          </div>
+      </div>
+      <div id="product-page" class="content-page hidden">
+          <table class="product-table">
+              <tr>
+                  <th>Product Name</th>
+                  <th>Product Owner</th>
+                  <th>Product Price</th>
+                  <th>Image</th>
+              </tr>
+              <tr>
+                  <td id="product-name">---</td>
+                  <td id="product-owner">---</td>
+                  <td id="product-price">---</td>
+                  <td><img id="product-image" src="" alt="Product Image" width="100" /></td>
+              </tr>
+          </table>
+          <button id="purchase-btn" class="button hidden">Purchase Product</button>
+          <button id="return-btn" class="button hidden">Return Product</button>
+      </div>
+      <div id="purchases" class="content-page hidden">
+          <h2>Purchases</h2>
+          <div id="purchases-list"></div>
+      </div>
+      <div id="load-balance" class="content-page hidden">
+          <h2>Load Balance</h2>
+          <input type="number" id="amount" placeholder="Enter amount" />
+          <button id="add-balance-btn" class="button">Add Balance</button>
+      </div>
+  </div>
+
+    <script src="./qrcode.min.js"></script>
+    <script>
+      let currentPage = "home";
+      let balance = 0;
+      let currentProductUID = "";
+      let html5QrCode;
+
+      function showPage(pageId) {
+        document.querySelectorAll(".content-page").forEach((page) => {
+          page.classList.add("hidden");
+        });
+        document.getElementById(pageId).classList.remove("hidden");
+        document.querySelectorAll(".menu a").forEach((link) => {
+          link.classList.remove("active");
+        });
+        document.getElementById(pageId + "-link").classList.add("active");
+      }
+
+      document.getElementById("home-link").addEventListener("click", () => {
+        currentPage = "home";
+        showPage("home");
+      });
+
+      document
+        .getElementById("purchases-link")
+        .addEventListener("click", () => {
+          currentPage = "purchases";
+          showPage("purchases");
+          fetchPurchases();
+        });
+
+      document
+        .getElementById("load-balance-link")
+        .addEventListener("click", () => {
+          currentPage = "load-balance";
+          showPage("load-balance");
+        });
+
+      document.getElementById("scan-btn").addEventListener("click", () => {
+        document.getElementById("qr-scanner").classList.remove("hidden");
+        html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode
+          .start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+            },
+            (qrCodeMessage) => {
+              console.log(`QR Code detected: ${qrCodeMessage}`);
+              html5QrCode
+                .stop()
+                .then(() => {
+                  document.getElementById("qr-scanner").classList.add("hidden");
+                  fetchProductInfo(qrCodeMessage);
+                })
+                .catch((err) => {
+                  console.error(`Error stopping QR code scanner: ${err}`);
+                });
+            },
+            (errorMessage) => {
+              console.warn(`QR Code no match: ${errorMessage}`);
+            }
+          )
+          .catch((err) => {
+            console.error(`Error starting QR code scanner: ${err}`);
+          });
+      });
+
+      function fetchProductInfo(uid) {
+        currentProductUID = uid;
+        fetch(`http://localhost:3001/checkUID?uid=${uid}`)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+            if (data.product.ProductOwner === "supermarket") {
+              document
+                .getElementById("purchase-btn")
+                .classList.remove("hidden");
+              document.getElementById("return-btn").classList.add("hidden");
+            } else {
+              document.getElementById("purchase-btn").classList.add("hidden");
+              document.getElementById("return-btn").classList.remove("hidden");
+            }
+            document.getElementById("product-name").innerText =
+              data.product.ProductName || "---";
+            document.getElementById("product-owner").innerText =
+              data.product.ProductOwner || "---";
+            document.getElementById("product-price").innerText =
+              data.product.ProductPrice || "---";
+            document.getElementById("product-image").src =
+              data.product.ImageLink || "";
+            showPage("product-page");
+          })
+          .catch((error) => {
+            console.error("Error fetching product info:", error);
+          });
+      }
+
+      document.getElementById("purchase-btn").addEventListener("click", () => {
+        fetch(`http://localhost:3001/checkUID?uid=${currentProductUID}`, {
+          method: "GET",
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.product.ProductPrice <= balance) {
+              fetch(`http://localhost:3001/purchaseProduct`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ uid: currentProductUID }),
+              })
+                .then((response) => response.json())
+                .then((data) => {
+                  if (data.success) {
+                    balance -= data.product.ProductPrice;
+                    updateBalance();
+                    alert("Product purchased successfully!");
+                    document
+                      .getElementById("purchase-btn")
+                      .classList.add("hidden");
+                    document
+                      .getElementById("return-btn")
+                      .classList.remove("hidden");
+                    fetchPurchases();
+                  } else {
+                    alert("Error purchasing product!");
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error purchasing product:", error);
+                });
+            } else {
+              alert("Insufficient balance!");
+            }
+          });
+      });
+
+      document.getElementById("return-btn").addEventListener("click", () => {
+        fetch(`http://localhost:3001/returnProduct`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ uid: currentProductUID }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              balance += data.product.ProductPrice; // Add the product price back to balance
+              updateBalance();
+              alert("Product returned successfully!");
+              document.getElementById("return-btn").classList.add("hidden");
+              document
+                .getElementById("purchase-btn")
+                .classList.remove("hidden");
+              fetchPurchases();
+            } else {
+              alert("Error returning product!");
+            }
+          })
+          .catch((error) => {
+            console.error("Error returning product:", error);
+          });
+      });
+
+      function fetchPurchases() {
+        fetch(`http://localhost:3001/purchases`)
+          .then((response) => response.json())
+          .then((data) => {
+            const purchasesList = document.getElementById("purchases-list");
+            purchasesList.innerHTML = "";
+            if (data.length > 0) {
+              const table = document.createElement("table");
+              table.classList.add("product-table");
+              const headerRow = document.createElement("tr");
+              const headers = [
+                "Product Name",
+                "Product Owner",
+                "Product Price",
+                "Image",
+                "Actions",
+              ];
+              headers.forEach((headerText) => {
+                const header = document.createElement("th");
+                header.innerText = headerText;
+                headerRow.appendChild(header);
+              });
+              table.appendChild(headerRow);
+
+              data.forEach((product) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                <td>${product.ProductName || "---"}</td>
+                <td>${product.ProductOwner || "---"}</td>
+                <td>${product.ProductPrice || "---"}</td>
+                <td><img src="${
+                  product.ImageLink || ""
+                }" alt="Product Image" width="50" /></td>
+                <td>
+                  <button class="button purchase-btn" data-uid="${
+                    product.UID
+                  }" ${
+                  product.ProductOwner !== "supermarket" ? "disabled" : ""
+                }>Buy</button>
+                  <button class="button return-btn" data-uid="${product.UID}" ${
+                  product.ProductOwner === "supermarket" ? "disabled" : ""
+                }>Return</button>
+                </td>
+              `;
+                table.appendChild(row);
+              });
+              purchasesList.appendChild(table);
+
+              document.querySelectorAll(".purchase-btn").forEach((button) => {
+                button.addEventListener("click", (event) => {
+                  const uid = event.target.getAttribute("data-uid");
+                  fetch(`http://localhost:3001/purchaseProduct`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ uid }),
+                  })
+                    .then((response) => response.json())
+                    .then((data) => {
+                      if (data.success) {
+                        alert("Product purchased successfully!");
+                        fetchPurchases();
+                      } else {
+                        alert("Error purchasing product!");
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("Error purchasing product:", error);
+                    });
+                });
+              });
+
+              document.querySelectorAll(".return-btn").forEach((button) => {
+                button.addEventListener("click", (event) => {
+                  const uid = event.target.getAttribute("data-uid");
+                  fetch(`http://localhost:3001/returnProduct`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ uid }),
+                  })
+                    .then((response) => response.json())
+                    .then((data) => {
+                      if (data.success) {
+                        alert("Product returned successfully!");
+                        fetchPurchases();
+                      } else {
+                        alert("Error returning product!");
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("Error returning product:", error);
+                    });
+                });
+              });
+            } else {
+              purchasesList.innerHTML = "<p>No purchases found.</p>";
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching purchases:", error);
+          });
+      }
+
+      document
+        .getElementById("add-balance-btn")
+        .addEventListener("click", () => {
+          const amount = parseFloat(document.getElementById("amount").value);
+          if (!isNaN(amount) && amount > 0) {
+            balance += amount;
+            updateBalance();
+            alert(`Added $${amount.toFixed(2)} to balance!`);
+          } else {
+            alert("Please enter a valid amount.");
+          }
+        });
+
+      function updateBalance() {
+        document.getElementById(
+          "balance"
+        ).innerText = `₹${balance.toFixed(2)}`;
+      }
+
+      showPage("home");
+    </script>
+  </body>
+</html>
